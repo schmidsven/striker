@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -153,5 +154,50 @@ func TestReportJSON(t *testing.T) {
 	}
 	if strings.Count(s, `"github"`) != 1 || strings.Count(s, `"prs"`) != 1 || strings.Contains(s, "prs_error") {
 		t.Errorf("empty fields not omitted: %s", s)
+	}
+}
+
+// blockingGH hangs until release is closed, like gh without network.
+type blockingGH struct{ release chan struct{} }
+
+func (g blockingGH) Run(string, ...string) ([]byte, error) {
+	<-g.release
+	return []byte(twoPRs), nil
+}
+
+// With Bg set (striker serve: a goroutine), Fill never waits on gh or git: a hanging gh must not hold the whole
+// status report. The list arrives on a later Fill, and only one refresh per slug runs at a time.
+func TestFillDoesNotWaitOnGh(t *testing.T) {
+	gh := blockingGH{release: make(chan struct{})}
+	var started sync.WaitGroup
+	c := &Cache{GH: gh, Git: func(string) gitrepo.Runner { return &fakeGit{origin: map[string]string{"/p/r": "https://github.com/o/r"}} },
+		Every: 60 * time.Second, Bg: func(f func()) { started.Add(1); go func() { defer started.Done(); f() }() }}
+	done := make(chan *status.Report)
+	go func() {
+		rep := report(status.Repo{Name: "r", Path: "/p/r"})
+		c.Fill(rep, time.Unix(1000, 0))
+		c.Fill(rep, time.Unix(1001, 0))
+		done <- rep
+	}()
+	var rep *status.Report
+	select {
+	case rep = <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Fill blocked on a hanging gh")
+	}
+	if rep.Repos[0].PRs != nil {
+		t.Errorf("PRs before gh answered: %+v", rep.Repos[0].PRs)
+	}
+	close(gh.release)
+	started.Wait()
+	rep = report(status.Repo{Name: "r", Path: "/p/r"})
+	c.Fill(rep, time.Unix(1002, 0))
+	started.Wait()
+	if len(rep.Repos[0].PRs) != 2 {
+		// the list may land just after this Fill read the cache: one more Fill must have it
+		c.Fill(rep, time.Unix(1003, 0))
+	}
+	if len(rep.Repos[0].PRs) != 2 {
+		t.Errorf("PRs after gh answered: %+v", rep.Repos[0])
 	}
 }
