@@ -196,13 +196,15 @@ function needRow(id, n, slug, onRow, indent = 0) {
     .children(links.map((l) => prButton(`${id}-pr-${l.label.slice(4)}`, l)));
 }
 
-// a column's OPEN PRS: up to five rows, then +<k> MORE; a gh error as one alert line
+// a column's OPEN PRS: up to five rows, then +<k> MORE; a gh error as one alert line. Rows are compact (PR_ROW, no
+// gap): the person wants the list dense, under the TOUCH size of the rest of the board.
+const PR_ROW = 26;
 function openPrs(id, repo) {
   const { rows, more } = prRows(repo.prs, repo.github);
   if (!rows.length && !repo.prs_error) return null;
-  const row = (key, url, kids) => press(h_flex().id(`${id}-pr-${key}`).w_full().h(TOUCH).flex_none().gap(8).items_center(),
+  const row = (key, url, kids) => press(h_flex().id(`${id}-pr-${key}`).w_full().h(PR_ROW).flex_none().gap(8).items_center(),
     () => openUrl(url)).children(kids);
-  return v_flex().w_full().gap(GAP)
+  return v_flex().w_full()
     .child(label("open prs", ROLE.label))
     .children(rows.map((p) => row(p.key, p.url, [
       div().flex_none().text_size(TEXT_BODY).font_weight(700).text_color(ROLE.text).child(p.number),
