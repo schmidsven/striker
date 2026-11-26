@@ -10,7 +10,7 @@ import { overviewRows, coordCard, changeColor, changeStatus, changeLive, planCar
   doneSummary, defaultOpen, tocLine, barColors, firstMode, commitsLine, specList } from "./overview.js";
 import { boardCoords, asker, headLine } from "./board.js";
 import { terminalState, parseAddress, cardBottom, ruleColor } from "./addr.js";
-import { repoPathFor, spaceTerminals, repoNotice, crewLabel, crewLines, crewEntry, shortTokens, strikerSelf } from "./space.js";
+import { repoPathFor, spaceTerminals, repoNotice, crewLabel, crewLines, crewEntry, shortTokens, strikerSelf, strikerLaunch } from "./space.js";
 import { ROLE, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
 import { withPromptTerminal, promptBlock } from "./prompt.js";
 import { crossing } from "./tree.js";
@@ -651,6 +651,25 @@ assert.deepEqual(kinds(diffBlocks(undefined, "x", undefined)), ["same:x"]);
   assert.equal(strikerSelf([{ address: "t16", labels: ["striker.self=1"] }]), "t16");
   assert.equal(strikerSelf([{ address: "t13" }]), null);
   assert.equal(strikerSelf(null), null);
+}
+
+// --- no Striker yet: start him in his repo, in the space STRIKER ---
+{
+  const repo = "/Users/p/dev/striker";
+  const made = strikerLaunch(repo, [{ address: "t1", labels: {} }], [{ name: "Infrastruktur" }]);
+  assert.equal(made.name, "STRIKER");
+  assert.equal(made.folder, repo);
+  assert.equal(made.argv[0], "claude");
+  assert.deepEqual(made.argv.slice(1, 3), ["--remote-control", "striker"]);
+  assert.match(made.argv[3], /striker\/CLAUDE\.md/);
+  // already there: a space STRIKER (any case, on this computer) or a terminal labelled striker.self
+  assert.equal(strikerLaunch(repo, [], [{ name: "striker" }]), null);
+  assert.equal(strikerLaunch(repo, [{ address: "t16", labels: { "striker.self": "1" } }], []), null);
+  // a STRIKER space on another machine is not him
+  assert.equal(strikerLaunch(repo, [], [{ name: "STRIKER", machine: "remote1" }]).name, "STRIKER");
+  // no repo known (an old striker serve): nothing
+  assert.equal(strikerLaunch(null, [], []), null);
+  assert.equal(strikerLaunch("", [], []), null);
 }
 
 // --- SPEC on a main checkout lists every spec ---
