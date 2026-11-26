@@ -561,7 +561,9 @@ func runServe(c hc.Client, fleetPath string, args []string) int {
 			fmt.Fprintln(os.Stderr, "striker:", err)
 		}
 		uh, _ := os.UserHomeDir()
-		return status.Build(c, f, uh, time.Now())
+		rep := status.Build(c, f, uh, time.Now())
+		rep.StrikerRepo = home.Repo()
+		return rep
 	}
 	s := serve.New(build, 20*time.Second)
 	s.Add("/crew", func() any {

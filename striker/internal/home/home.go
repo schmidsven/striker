@@ -17,3 +17,6 @@ func Dir() string {
 	}
 	return filepath.Join(h, "striker", "striker")
 }
+
+// Repo returns the working copy around Dir: where Striker's own Claude starts.
+func Repo() string { return filepath.Dir(Dir()) }

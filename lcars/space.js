@@ -27,6 +27,20 @@ export function strikerSelf(list) {
   return t?.address ?? null;
 }
 
+// What to start when Striker is missing: herdr's space.new params for a space STRIKER in his repo (`repo`, from
+// /status striker_repo) with Claude told to read his role, or null when there is nothing to do: no repo known, a
+// terminal labelled striker.self (`list`, herdr's terminals()), or a local space STRIKER (`spaces`) already open.
+export function strikerLaunch(repo, list, spaces) {
+  if (!repo || strikerSelf(list)) return null;
+  if ((Array.isArray(spaces) ? spaces : []).some((s) => !machineOf(s?.machine) && up(s?.name) === "STRIKER")) return null;
+  return {
+    name: "STRIKER",
+    folder: repo,
+    tab: "striker",
+    argv: ["claude", "--remote-control", "striker", "Lies striker/CLAUDE.md: das ist deine Rolle als Striker."],
+  };
+}
+
 // The terminals of `space` (herdr's SpaceInfo): the panes of its tabs that hold a terminal, each with its live
 // cwd and its labels from `list` (herdr's terminals()), matched across address forms ("t7" / "remote1/t7").
 export function spaceTerminals(space, panes, list) {

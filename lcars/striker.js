@@ -10,7 +10,7 @@ import { withPromptTerminal } from "./prompt.js";
 import { stardate } from "./stardate.js";
 import { C, ROLE, STATUS, WORD, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
 import { KIND, boardCoords, asker, headLine } from "./board.js";
-import { crewEntry, strikerSelf } from "./space.js";
+import { crewEntry, strikerSelf, strikerLaunch } from "./space.js";
 
 export const FLEET_KEY = "striker.fleet";
 export const VIEW_KEY = "striker.view"; // "board" while the board is shown, else terminals
@@ -37,6 +37,7 @@ export async function pollFleet() {
       if (r.ok) {
         let data = null;
         try { data = await r.json(); } catch { /* unparsable body, handled below */ }
+        if (data && typeof data === "object") launchStriker(data.striker_repo);
         next = data && typeof data === "object"
           ? { ok: true, at: Date.now(), updated: data.updated ?? null, repos: data.repos ?? [] }
           : { ...(prev ?? {}), ok: false, error: "STRIKER SERVE BAD ANSWER", at: Date.now() };
@@ -53,6 +54,16 @@ export async function pollFleet() {
   } finally {
     asking = 0;
   }
+}
+
+// At Herdr's start, once the first /status answer names Striker's repo: no Striker yet → open the space STRIKER with
+// his Claude. Once per Herdr run (shared across this mod's copies), so a STRIKER closed on purpose stays closed.
+const LAUNCHED_KEY = "striker.launched";
+function launchStriker(repo) {
+  if (!repo || shared(LAUNCHED_KEY)) return;
+  setShared(LAUNCHED_KEY, true);
+  const made = strikerLaunch(repo, terminals(), spaces());
+  if (made) run("space.new", { ...made, focus: false });
 }
 
 // Striker's crew (names, ranks, model, tokens) for the sidebar's CREW rows, from /crew into shared "striker.crew";

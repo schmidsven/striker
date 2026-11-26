@@ -20,6 +20,8 @@ import (
 type Report struct {
 	Updated string `json:"updated"`
 	Repos   []Repo `json:"repos"`
+	// StrikerRepo is the working copy of Striker itself; the LCARS mod starts Striker's Claude there.
+	StrikerRepo string `json:"striker_repo,omitempty"`
 }
 
 type Repo struct {

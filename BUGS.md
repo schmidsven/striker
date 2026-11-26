@@ -36,4 +36,7 @@ id in its commit (`Fixes B<n>`) and moves the entry to "Fixed".
 
 ## Fixed
 
-(none yet)
+- **B9** (2026-11-26, macOS install) Nothing started Striker's own Claude: after a fresh install Fleet
+  Operations had no Claude terminal (and the layout's `striker-prompt` pointed at a foreign `t16`). Now the
+  LCARS mod opens the space STRIKER in Striker's repo (`/status` `striker_repo`) at Herdr's start when no
+  Striker runs.
