@@ -29,6 +29,7 @@ import (
 	"github.com/ploenk42/striker/striker/internal/lead"
 	"github.com/ploenk42/striker/striker/internal/openspec"
 	"github.com/ploenk42/striker/striker/internal/plans"
+	"github.com/ploenk42/striker/striker/internal/prs"
 	"github.com/ploenk42/striker/striker/internal/relay"
 	"github.com/ploenk42/striker/striker/internal/repoview"
 	"github.com/ploenk42/striker/striker/internal/serve"
@@ -555,6 +556,10 @@ func runServe(c hc.Client, fleetPath string, args []string) int {
 		fmt.Fprintf(os.Stderr, "striker: serve only binds loopback addresses, not %q\n", host)
 		return 2
 	}
+	// each repo's GitHub slug and open PRs: gh at most once a minute per repo
+	pulls := &prs.Cache{GH: ghExec{hc.Exec{Bin: "gh", Timeout: 10 * time.Second}},
+		Git: func(m string) gitrepo.Runner { return gitrepo.For(hc.Exec{}, m) }, Every: 60 * time.Second,
+		Bg: func(f func()) { go f() }}
 	build := func() status.Report {
 		f, err := fleet.Load(fleetPath)
 		if err != nil {
@@ -563,6 +568,7 @@ func runServe(c hc.Client, fleetPath string, args []string) int {
 		uh, _ := os.UserHomeDir()
 		rep := status.Build(c, f, uh, time.Now())
 		rep.StrikerRepo = home.Repo()
+		pulls.Fill(&rep, time.Now())
 		return rep
 	}
 	s := serve.New(build, 20*time.Second)

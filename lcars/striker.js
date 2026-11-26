@@ -9,7 +9,8 @@ import { parseAddress } from "./addr.js";
 import { withPromptTerminal } from "./prompt.js";
 import { stardate } from "./stardate.js";
 import { C, ROLE, STATUS, WORD, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
-import { KIND, boardCoords, asker, headLine } from "./board.js";
+import { KIND, boardCoords, asker, headLine, prLinks, prRows } from "./board.js";
+import { openUrl } from "./open.js";
 import { crewEntry, strikerSelf, strikerLaunch, strikerTerminal } from "./space.js";
 
 export const FLEET_KEY = "striker.fleet";
@@ -175,6 +176,46 @@ function ago(iso, now) {
 const press = (el, fn) => el.cursor_pointer().hover((s) => s.opacity(0.85)).on_click(() => fn());
 const label = (text, color) => div().text_size(TEXT_MIN).font_weight(700).text_color(color ?? ROLE.label).child(up(text));
 
+// a PR named in a needs_you text: an alert-outlined button that opens it; its press does not reach the row (lead)
+const prButton = (id, link) => h_flex().id(id).h(TOUCH).flex_none().px(10).items_center().rounded(TOUCH / 2)
+  .border(2).border_color(ROLE.alert).text_size(TEXT_MIN).font_weight(700).text_color(ROLE.alert)
+  .cursor_pointer().hover((s) => s.opacity(0.85))
+  .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+  .on_click((_e, cx) => { cx?.stop_propagation?.(); openUrl(link.url); })
+  .child(`${link.label} ↗`);
+
+// one needs_you row: kind, text, a button per PR the text names (only a row with buttons wraps, so a plain
+// row keeps its text beside the kind in a narrow column)
+function needRow(id, n, slug, onRow, indent = 0) {
+  const links = prLinks(n.text, slug);
+  return h_flex().id(id).w_full().gap(8).items_start().pl(indent).when(links.length > 0, (e) => e.flex_wrap())
+    .when(!!onRow, (e) => press(e, onRow))
+    .child(div().flex_none().w(86).h(24).bg(ROLE.alert).flex().items_center().justify_center()
+      .text_size(TEXT_MIN).font_weight(700).text_color(ROLE.ink).child(KIND[n.kind] ?? up(n.kind ?? "FRAGE")))
+    .child(div().flex_1().min_w(links.length > 0 ? 120 : 0).text_size(TEXT_BODY).text_color(ROLE.text).child(String(n.text)))
+    .children(links.map((l) => prButton(`${id}-pr-${l.label.slice(4)}`, l)));
+}
+
+// a column's OPEN PRS: up to five rows, then +<k> MORE; a gh error as one alert line
+function openPrs(id, repo) {
+  const { rows, more } = prRows(repo.prs, repo.github);
+  if (!rows.length && !repo.prs_error) return null;
+  const row = (key, url, kids) => press(h_flex().id(`${id}-pr-${key}`).w_full().h(TOUCH).flex_none().gap(8).items_center(),
+    () => openUrl(url)).children(kids);
+  return v_flex().w_full().gap(GAP)
+    .child(label("open prs", ROLE.label))
+    .children(rows.map((p) => row(p.key, p.url, [
+      div().flex_none().text_size(TEXT_BODY).font_weight(700).text_color(ROLE.text).child(p.number),
+      ...(p.draft ? [div().flex_none().text_size(TEXT_MIN).font_weight(700).text_color(ROLE.neutral).child("DRAFT")] : []),
+      div().flex_1().min_w(0).truncate().text_size(TEXT_BODY).text_color(ROLE.text).child(p.title),
+      div().flex_none().text_size(TEXT_BODY).text_color(ROLE.label).child("↗"),
+    ])))
+    .when(!!more, (e) => e.child(row("more", more?.url, [
+      div().flex_1().text_size(TEXT_MIN).font_weight(700).text_color(ROLE.label).child(`${more?.label} ↗`)])))
+    .when(!!repo.prs_error, (e) => e.child(div().w_full().text_size(TEXT_MIN).text_color(ROLE.alert)
+      .child(up(`PRS: ${repo.prs_error}`))));
+}
+
 // a slab with its label bottom-right, the LCARS way
 function slab(id, color, text, h, extra) {
   const el = div().id(id).w_full().h(h).flex_none().bg(color).flex().items_end().justify_end().px(10).pb(2)
@@ -208,6 +249,7 @@ function column(v, now) {
   const { repo, lead, state, st, needs, needy } = v;
   const id = `striker-${repo.name}`;
   const phase = st?.phase ?? null;
+  const prs = openPrs(id, repo);
   // a finished task is done, whatever its lead does now
   const head = needy ? ROLE.alert : phase === "done" ? ROLE.done : STATUS[state] ?? ROLE.neutral;
   const word = phase === "done" ? "COMPLETE" : WORD[state] ?? up(state ?? "UNKNOWN");
@@ -226,11 +268,8 @@ function column(v, now) {
   const body = v_flex().id(`${id}-body`).w_full().flex_1().min_h(0).overflow_y_scrollbar().gap(10).p(10).border_l(14).border_color(head)
     // what waits on the person comes first
     .when(needs.length > 0, (e) => e.child(v_flex().w_full().gap(GAP).children(needs.map((n, i) =>
-      h_flex().id(`${id}-need-${i}`).w_full().gap(8).items_start()
-        .when(!!lead?.address, (e) => press(e, () => focusLead(lead.address)))
-        .child(div().flex_none().w(86).h(24).bg(ROLE.alert).flex().items_center().justify_center()
-          .text_size(TEXT_MIN).font_weight(700).text_color(ROLE.ink).child(KIND[n.kind] ?? up(n.kind ?? "FRAGE")))
-        .child(div().flex_1().min_w(0).text_size(TEXT_BODY).text_color(ROLE.text).child(String(n.text)))))))
+      needRow(`${id}-need-${i}`, n, repo.github, lead?.address ? () => focusLead(lead.address) : null)))))
+    .when(!!prs, (e) => e.child(prs))
     .when(!!phase && phase !== "idle" && phase !== "done", (e) => e.child(v_flex().w_full().gap(4)
       .child(label("phase", ROLE.label)).child(phaseRow(id, phase))))
     .child(v_flex().w_full().gap(2)
@@ -265,11 +304,8 @@ function column(v, now) {
           .child(up([c.address, c.worktree, c.task, c.error ? `STATUS: ${c.error}` : null, c.updated ? `UPDATED ${ago(c.updated, now)}` : null]
             .filter(Boolean).join(" · ")))))
       .when(!!c.address, (e) => press(e, () => focusLead(c.address))))
-    .children(c.needs.map((n, i) => h_flex().id(`${id}-coord-${k}-need-${i}`).w_full().gap(8).items_start().pl(20)
-      .when(!!c.address, (e) => press(e, () => focusLead(c.address)))
-      .child(div().flex_none().w(86).h(24).bg(ROLE.alert).flex().items_center().justify_center()
-        .text_size(TEXT_MIN).font_weight(700).text_color(ROLE.ink).child(KIND[n.kind] ?? up(n.kind ?? "FRAGE")))
-      .child(div().flex_1().min_w(0).text_size(TEXT_BODY).text_color(ROLE.text).child(String(n.text))))));
+    .children(c.needs.map((n, i) =>
+      needRow(`${id}-coord-${k}-need-${i}`, n, repo.github, c.address ? () => focusLead(c.address) : null, 20))));
 
   return v_flex().id(id).flex_1().min_w(220).h_full().gap(GAP)
     .child(header)
