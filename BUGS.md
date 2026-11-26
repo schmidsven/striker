@@ -29,6 +29,10 @@ id in its commit (`Fixes B<n>`) and moves the entry to "Fixed".
 - **B7** (2026-11-25, moving the working copy) Running `install.ps1` from a new folder leaves the old one's
   `striker\bin` in the user PATH and keeps an existing Claude status line in `~/.claude/settings.json` that
   points at the old binary. The installer should replace its own earlier PATH entry and status line.
+- **B8** (2026-11-26, macOS install) `install.sh` sets `STRIKER_HOME` only in the LaunchAgent plist. In a
+  shell, `striker status` falls back to `~/striker/striker` and fails with "open …/fleet.json: no such file or
+  directory" when the working copy lives elsewhere (here `~/develop/dg/striker`). `home.Dir()` should find the
+  directory from the binary's own location (`bin/..`), or the installer should set `STRIKER_HOME` for the shell.
 
 ## Fixed
 
