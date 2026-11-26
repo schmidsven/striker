@@ -14,7 +14,7 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>@HOME@/.local/bin:/srv/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>@HOME@/.local/bin:/opt/homebrew/bin:/srv/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>STRIKER_HOME</key>
     <string>@REPO@/striker</string>
   </dict>

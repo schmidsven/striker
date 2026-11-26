@@ -61,3 +61,28 @@ export function asker({ lead, leadNeedy = false, coords = [] }) {
   if (c) return c.address;
   return lead?.address ?? null;
 }
+
+const gh = (slug) => `https://github.com/${slug}`;
+
+// The PRs a needs_you text names ("PR #29", "pr#29"; a bare "#29" is not one), each once in order of appearance,
+// as buttons to the repo's GitHub (slug "owner/repo" from /status `github`); none without a slug.
+export function prLinks(text, slug) {
+  if (!slug || !text) return [];
+  const seen = new Set();
+  const out = [];
+  for (const m of String(text).matchAll(/\bPR\s*#(\d+)/gi)) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    out.push({ label: `PR #${m[1]}`, url: `${gh(slug)}/pull/${m[1]}` });
+  }
+  return out;
+}
+
+// A column's OPEN PRS (/status `prs`): the first `max` as rows, the rest as one row to the repo's pulls page.
+export function prRows(prs, slug, max = 5) {
+  const list = Array.isArray(prs) ? prs.filter((p) => p && p.number) : [];
+  const rows = list.slice(0, max).map((p) => ({ key: String(p.number), number: `#${p.number}`, title: String(p.title ?? ""),
+    draft: !!p.draft, url: p.url }));
+  const more = list.length > max && slug ? { label: `+${list.length - max} MORE`, url: `${gh(slug)}/pulls` } : null;
+  return { rows, more };
+}
