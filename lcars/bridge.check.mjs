@@ -8,7 +8,7 @@ import { treeLayout, columnXs, laneColor, laneState, labelWidth, fitLabel, progr
 import { overviewRows, coordCard, changeColor, changeStatus, changeLive, planCard, READY_TEXT, interruptedText, nowTask, afterText,
   briefingLine, itemLabel, registerSummary, isMainCheckout, defaultMode, changeSpace, repoName, docHeadings, tocText, newestFirst,
   doneSummary, defaultOpen, tocLine, barColors, firstMode, commitsLine, specList } from "./overview.js";
-import { boardCoords, asker, headLine } from "./board.js";
+import { boardCoords, asker, headLine, prLinks, prRows } from "./board.js";
 import { terminalState, parseAddress, cardBottom, ruleColor } from "./addr.js";
 import { repoPathFor, spaceTerminals, repoNotice, crewLabel, crewLines, crewEntry, shortTokens, strikerSelf } from "./space.js";
 import { ROLE, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
@@ -670,6 +670,32 @@ assert.deepEqual(kinds(diffBlocks(undefined, "x", undefined)), ["same:x"]);
   assert.equal(stardate(new Date(2026, 10, 24, 15, 30, 42).getTime()), "20261124.153042");
   assert.equal(stardate(new Date(2026, 0, 2, 3, 4, 5).getTime()), "20260102.030405");
   assert.equal(stardate(new Date(2026, 11, 31, 23, 59, 59).getTime()), "20261231.235959");
+}
+
+// --- PR buttons in a needs_you text: every "PR #<n>" once, linked to the repo's GitHub ---
+{
+  assert.deepEqual(prLinks("PR #29 und PR #31 mergen", "o/r"), [
+    { label: "PR #29", url: "https://github.com/o/r/pull/29" },
+    { label: "PR #31", url: "https://github.com/o/r/pull/31" },
+  ]);
+  assert.deepEqual(prLinks("pr#29, PR #29.", "o/r"), [{ label: "PR #29", url: "https://github.com/o/r/pull/29" }]);
+  assert.deepEqual(prLinks("issue #29 und #30", "o/r"), []);
+  assert.deepEqual(prLinks("PR #29", null), []);
+  assert.deepEqual(prLinks(null, "o/r"), []);
+}
+
+// --- OPEN PRS rows: at most 5, then +<k> MORE to the repo's pulls page ---
+{
+  const pr = (n, draft = false) => ({ number: n, title: `t${n}`, url: `u${n}`, draft, branch: "b" });
+  const seven = prRows([1, 2, 3, 4, 5, 6, 7].map((n) => pr(n)), "o/r");
+  assert.equal(seven.rows.length, 5);
+  assert.deepEqual(seven.rows[0], { key: "1", number: "#1", title: "t1", draft: false, url: "u1" });
+  assert.deepEqual(seven.more, { label: "+2 MORE", url: "https://github.com/o/r/pulls" });
+  const two = prRows([pr(29), pr(31, true)], "o/r");
+  assert.equal(two.more, null);
+  assert.equal(two.rows[1].draft, true);
+  assert.deepEqual(prRows(null, "o/r"), { rows: [], more: null });
+  assert.equal(prRows([1, 2, 3, 4, 5, 6].map((n) => pr(n)), null).more, null);
 }
 
 console.log("ok");
