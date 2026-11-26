@@ -41,6 +41,13 @@ export function strikerLaunch(repo, list, spaces) {
   };
 }
 
+// The first terminal of the local space STRIKER (herdr's spaces() and panes()), or null: Striker even while his
+// Claude reports no status, so herdr does not list him among agents().
+export function strikerTerminal(spaces, panes, list) {
+  const s = (Array.isArray(spaces) ? spaces : []).find((x) => !machineOf(x?.machine) && up(x?.name) === "STRIKER");
+  return spaceTerminals(s, panes, list)[0]?.address ?? null;
+}
+
 // The terminals of `space` (herdr's SpaceInfo): the panes of its tabs that hold a terminal, each with its live
 // cwd and its labels from `list` (herdr's terminals()), matched across address forms ("t7" / "remote1/t7").
 export function spaceTerminals(space, panes, list) {

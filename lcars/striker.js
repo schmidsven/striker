@@ -10,7 +10,7 @@ import { withPromptTerminal } from "./prompt.js";
 import { stardate } from "./stardate.js";
 import { C, ROLE, STATUS, WORD, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
 import { KIND, boardCoords, asker, headLine } from "./board.js";
-import { crewEntry, strikerSelf, strikerLaunch } from "./space.js";
+import { crewEntry, strikerSelf, strikerLaunch, strikerTerminal } from "./space.js";
 
 export const FLEET_KEY = "striker.fleet";
 export const VIEW_KEY = "striker.view"; // "board" while the board is shown, else terminals
@@ -134,7 +134,8 @@ const strikerAgent = () => {
     return agents().find((a) => { const p = parseAddress(a.address, a.machine); return p.id === want.id && p.machine === want.machine; })
       ?? { address: self };
   }
-  return agents().find((a) => up(a.space_name) === "STRIKER");
+  const t = strikerTerminal(spaces(), panes(), terminals());
+  return agents().find((a) => up(a.space_name) === "STRIKER") ?? (t ? { address: t } : undefined);
 };
 
 // Point the layout's striker-prompt block at Striker's current terminal (it changes when Striker is restarted).
