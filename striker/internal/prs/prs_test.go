@@ -157,6 +157,84 @@ func TestReportJSON(t *testing.T) {
 	}
 }
 
+type goneCall struct {
+	slug  string
+	pr    int
+	leads []string
+}
+
+// goneCache is a cache over o/r at /p/r whose Gone calls land in calls; gh answers what gh.out holds.
+func goneCache(gh *fakeGH, calls *[]goneCall) *Cache {
+	c := cache(gh, map[string]*fakeGit{"": {origin: map[string]string{"/p/r": "https://github.com/o/r"}}})
+	c.Gone = func(slug string, pr status.PR, leads []string) { *calls = append(*calls, goneCall{slug, pr.Number, leads}) }
+	return c
+}
+
+func ledRepo() *status.Report {
+	return report(status.Repo{Name: "r", Path: "/p/r", Lead: &status.Lead{Address: "t1"}})
+}
+
+const onlyPR31 = `[{"number":31,"title":"b","url":"u31","isDraft":true,"headRefName":"x"}]`
+
+func TestGoneMerged(t *testing.T) {
+	gh := &fakeGH{out: twoPRs}
+	var calls []goneCall
+	c := goneCache(gh, &calls)
+	c.Fill(ledRepo(), time.Unix(1000, 0))
+	gh.out = onlyPR31
+	c.Fill(ledRepo(), time.Unix(1061, 0))
+	want := []goneCall{{"o/r", 29, []string{"t1"}}}
+	if !reflect.DeepEqual(calls, want) {
+		t.Fatalf("Gone calls = %+v, want %+v", calls, want)
+	}
+}
+
+func TestGoneNotOnFirstList(t *testing.T) {
+	var calls []goneCall
+	c := goneCache(&fakeGH{out: onlyPR31}, &calls)
+	c.Fill(ledRepo(), time.Unix(1000, 0))
+	if len(calls) != 0 {
+		t.Fatalf("Gone on first list: %+v", calls)
+	}
+}
+
+func TestGoneNotOnGhError(t *testing.T) {
+	gh := &fakeGH{out: twoPRs}
+	var calls []goneCall
+	c := goneCache(gh, &calls)
+	c.Fill(ledRepo(), time.Unix(1000, 0))
+	gh.out, gh.err = "", errors.New("gh: network down")
+	c.Fill(ledRepo(), time.Unix(1061, 0))
+	if len(calls) != 0 {
+		t.Fatalf("Gone after failed gh: %+v", calls)
+	}
+	gh.out, gh.err = onlyPR31, nil
+	c.Fill(ledRepo(), time.Unix(1122, 0))
+	if len(calls) != 1 || calls[0].pr != 29 {
+		t.Fatalf("Gone after recovery = %+v, want PR 29 once", calls)
+	}
+}
+
+func TestGoneNoLead(t *testing.T) {
+	gh := &fakeGH{out: twoPRs}
+	var calls []goneCall
+	c := goneCache(gh, &calls)
+	c.Fill(report(status.Repo{Name: "r", Path: "/p/r"}), time.Unix(1000, 0))
+	gh.out = onlyPR31
+	c.Fill(report(status.Repo{Name: "r", Path: "/p/r", Lead: &status.Lead{}}), time.Unix(1061, 0))
+	if len(calls) != 1 || calls[0].leads != nil {
+		t.Fatalf("Gone without lead = %+v, want one call with no leads", calls)
+	}
+}
+
+func TestGoneNilCallback(t *testing.T) {
+	gh := &fakeGH{out: twoPRs}
+	c := cache(gh, map[string]*fakeGit{"": {origin: map[string]string{"/p/r": "https://github.com/o/r"}}})
+	c.Fill(ledRepo(), time.Unix(1000, 0))
+	gh.out = onlyPR31
+	c.Fill(ledRepo(), time.Unix(1061, 0)) // must not panic
+}
+
 // blockingGH hangs until release is closed, like gh without network.
 type blockingGH struct{ release chan struct{} }
 

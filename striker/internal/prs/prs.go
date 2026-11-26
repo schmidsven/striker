@@ -37,21 +37,26 @@ func Parse(b []byte) ([]status.PR, error) {
 // Cache remembers slugs for the life of the process and PR lists for Every; Git gives the git runner of a
 // machine ("" = this computer). Bg runs the git and gh lookups: nil runs them inside Fill; striker serve passes
 // a goroutine, so a slow or hanging gh never holds the status report (the answer lands on a later Fill).
+// Gone, if set, gets each PR that left a slug's open list between two successful lookups, with the lead
+// addresses of the repos on that slug; the first list after start and failed lookups report nothing.
 type Cache struct {
 	GH    issues.GH
 	Git   func(machine string) gitrepo.Runner
 	Every time.Duration
 	Bg    func(func())
+	Gone  func(slug string, pr status.PR, leads []string)
 
 	mu     sync.Mutex
-	slugs  map[string]string // machine|path → slug ("" = not GitHub)
-	lists  map[string]*list  // slug → last list
-	flight map[string]bool   // lookups running: "slug|"+machine|path, "list|"+slug
+	slugs  map[string]string   // machine|path → slug ("" = not GitHub)
+	lists  map[string]*list    // slug → last list
+	flight map[string]bool     // lookups running: "slug|"+machine|path, "list|"+slug
+	leads  map[string][]string // slug → lead addresses from the last Fill
 }
 
 type list struct {
 	at  time.Time
 	prs []status.PR
+	ok  bool // prs came from a successful lookup
 	err string
 }
 
@@ -88,6 +93,15 @@ func (c *Cache) jobs(rep *status.Report, now time.Time, slugs bool) []func() {
 	defer c.mu.Unlock()
 	if c.slugs == nil {
 		c.slugs, c.lists, c.flight = map[string]string{}, map[string]*list{}, map[string]bool{}
+	}
+	if !slugs {
+		c.leads = map[string][]string{}
+		for i := range rep.Repos {
+			r := &rep.Repos[i]
+			if slug := c.slugs[key(r)]; r.Path != "" && slug != "" && r.Lead != nil && r.Lead.Address != "" {
+				c.leads[slug] = append(c.leads[slug], r.Lead.Address)
+			}
+		}
 	}
 	var out []func()
 	for i := range rep.Repos {
@@ -140,7 +154,6 @@ func (c *Cache) lookList(slug string, now time.Time) {
 		prs, err = Parse(out)
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	delete(c.flight, "list|"+slug)
 	l := c.lists[slug]
 	if l == nil {
@@ -150,7 +163,34 @@ func (c *Cache) lookList(slug string, now time.Time) {
 	l.at = now
 	if err != nil { // the last list stays
 		l.err, _, _ = strings.Cut(strings.TrimSpace(err.Error()), "\n")
+		c.mu.Unlock()
 		return
 	}
-	l.prs, l.err = prs, ""
+	var gone []status.PR
+	if l.ok {
+		gone = missing(l.prs, prs)
+	}
+	l.prs, l.ok, l.err = prs, true, ""
+	leads := c.leads[slug]
+	c.mu.Unlock()
+	if c.Gone != nil {
+		for _, p := range gone {
+			c.Gone(slug, p, leads)
+		}
+	}
+}
+
+// missing are the PRs of old whose number is not in now.
+func missing(old, now []status.PR) []status.PR {
+	open := map[int]bool{}
+	for _, p := range now {
+		open[p.Number] = true
+	}
+	var out []status.PR
+	for _, p := range old {
+		if !open[p.Number] {
+			out = append(out, p)
+		}
+	}
+	return out
 }

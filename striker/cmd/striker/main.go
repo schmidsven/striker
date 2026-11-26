@@ -556,10 +556,14 @@ func runServe(c hc.Client, fleetPath string, args []string) int {
 		fmt.Fprintf(os.Stderr, "striker: serve only binds loopback addresses, not %q\n", host)
 		return 2
 	}
-	// each repo's GitHub slug and open PRs: gh at most once a minute per repo
-	pulls := &prs.Cache{GH: ghExec{hc.Exec{Bin: "gh", Timeout: 10 * time.Second}},
+	// each repo's GitHub slug and open PRs: gh at most once a minute per repo; a PR that leaves the list is
+	// reported to the repo's lead as merged or closed
+	gh := ghExec{hc.Exec{Bin: "gh", Timeout: 10 * time.Second}}
+	notice := &prs.Notifier{GH: gh, Send: c.Send,
+		Logf: func(format string, a ...any) { fmt.Fprintf(os.Stderr, "striker: "+format+"\n", a...) }}
+	pulls := &prs.Cache{GH: gh,
 		Git: func(m string) gitrepo.Runner { return gitrepo.For(hc.Exec{}, m) }, Every: 60 * time.Second,
-		Bg: func(f func()) { go f() }}
+		Bg: func(f func()) { go f() }, Gone: notice.Gone}
 	build := func() status.Report {
 		f, err := fleet.Load(fleetPath)
 		if err != nil {
