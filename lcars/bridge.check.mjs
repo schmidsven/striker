@@ -10,7 +10,7 @@ import { overviewRows, coordCard, changeColor, changeStatus, changeLive, planCar
   doneSummary, defaultOpen, tocLine, barColors, firstMode, commitsLine, specList } from "./overview.js";
 import { boardCoords, asker, headLine } from "./board.js";
 import { terminalState, parseAddress, cardBottom, ruleColor } from "./addr.js";
-import { repoPathFor, spaceTerminals, repoNotice, crewLabel, crewLines, crewEntry, shortTokens, strikerSelf, strikerLaunch } from "./space.js";
+import { repoPathFor, spaceTerminals, repoNotice, crewLabel, crewLines, crewEntry, shortTokens, strikerSelf, strikerLaunch, strikerTerminal } from "./space.js";
 import { ROLE, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
 import { withPromptTerminal, promptBlock } from "./prompt.js";
 import { crossing } from "./tree.js";
@@ -670,6 +670,16 @@ assert.deepEqual(kinds(diffBlocks(undefined, "x", undefined)), ["same:x"]);
   // no repo known (an old striker serve): nothing
   assert.equal(strikerLaunch(null, [], []), null);
   assert.equal(strikerLaunch("", [], []), null);
+}
+
+// --- Striker's terminal in the space STRIKER, also while his Claude reports no status (no agent for herdr) ---
+{
+  const spaces = [{ name: "Infrastruktur", tabs: [{ id: "a" }] }, { name: "STRIKER", tabs: [{ id: "b" }] }];
+  const panes = [{ tab: "a", terminal: "t10" }, { tab: "b", terminal: "t1s" }];
+  assert.equal(strikerTerminal(spaces, panes, []), "t1s");
+  assert.equal(strikerTerminal([{ name: "STRIKER", machine: "remote1", tabs: [{ id: "b" }] }], panes, []), null);
+  assert.equal(strikerTerminal([spaces[0]], panes, []), null);
+  assert.equal(strikerTerminal(null, null, null), null);
 }
 
 // --- SPEC on a main checkout lists every spec ---
