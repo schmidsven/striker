@@ -32,6 +32,20 @@ type Repo struct {
 	Lead         *Lead           `json:"lead"`
 	Status       json.RawMessage `json:"status"`
 	Coordinators []Coord         `json:"coordinators"`
+	// GitHub is the repo's GitHub "owner/repo" from origin, PRs its open pull requests (both filled by package
+	// prs in striker serve); PRsError is gh's first error line while the last list is kept.
+	GitHub   string `json:"github,omitempty"`
+	PRs      []PR   `json:"prs,omitempty"`
+	PRsError string `json:"prs_error,omitempty"`
+}
+
+// PR is one open pull request of a repo.
+type PR struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Draft  bool   `json:"draft"`
+	Branch string `json:"branch"`
 }
 
 // Coord is a coordinator terminal (labels striker.coordinator=<change>,
