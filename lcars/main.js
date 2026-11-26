@@ -5,7 +5,8 @@
 // Right-clicks open Herdr's own menu mod, so rename, close, split and worktrees work as in its other layouts.
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, ScrollHandle } from "gpui-base";
-import { spaces, agents, machines, run, props, setAgentOrder, window, openOverlay, closeOverlay, exec, home, shared, setShared, nextCommand } from "herdr";
+import { spaces, agents, machines, run, props, setAgentOrder, window, openOverlay, closeOverlay, home, shared, setShared, nextCommand } from "herdr";
+import { openUrl } from "./open.js";
 import * as fs from "fs/promises";
 import { board, pollFleet, pollCrew, fixStrikerPrompt, fleetCounts, showBoard, VIEW_KEY, CREW_KEY, POLL as FLEET_POLL } from "./striker.js";
 import { C, ROLE, STATUS, SPACE_COLORS, TEXT_MIN, TEXT_BODY, TOUCH } from "./palette.js";
@@ -64,11 +65,6 @@ async function shepherdr() {
   // merging counts as working: Shepherdr is busy with it
   return { url, need: asks.length + count("need"), ready: count("ready"), working: count("work", "merging") };
 }
-const OPENER = { macos: ["open"], windows: ["cmd", "/c", "start", ""], linux: ["xdg-open"] };
-const openUrl = (url) => {
-  const [cmd, ...args] = OPENER[window()?.platform] ?? OPENER.linux;
-  return exec(cmd, [...args, url]).catch(() => {});
-};
 
 // Herdr's menu mod at the pointer: tab is "space", "tab", "pane" or "global"
 const menu = (tab, target) => openOverlay({ mod: "menu", kind: "popup", width: 200, height: 260, props: { tab, target } });
