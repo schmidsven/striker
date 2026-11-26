@@ -172,13 +172,17 @@ const prButton = (id, link) => h_flex().id(id).h(TOUCH).flex_none().px(10).items
   .on_click((_e, cx) => { cx?.stop_propagation?.(); openUrl(link.url); })
   .child(`${link.label} ↗`);
 
-// one needs_you row: kind, text, a button per PR the text names
-const needRow = (id, n, slug, onRow, indent = 0) => h_flex().id(id).w_full().gap(8).items_start().flex_wrap().pl(indent)
-  .when(!!onRow, (e) => press(e, onRow))
-  .child(div().flex_none().w(86).h(24).bg(ROLE.alert).flex().items_center().justify_center()
-    .text_size(TEXT_MIN).font_weight(700).text_color(ROLE.ink).child(KIND[n.kind] ?? up(n.kind ?? "FRAGE")))
-  .child(div().flex_1().min_w(120).text_size(TEXT_BODY).text_color(ROLE.text).child(String(n.text)))
-  .children(prLinks(n.text, slug).map((l) => prButton(`${id}-pr-${l.label.slice(4)}`, l)));
+// one needs_you row: kind, text, a button per PR the text names (only a row with buttons wraps, so a plain
+// row keeps its text beside the kind in a narrow column)
+function needRow(id, n, slug, onRow, indent = 0) {
+  const links = prLinks(n.text, slug);
+  return h_flex().id(id).w_full().gap(8).items_start().pl(indent).when(links.length > 0, (e) => e.flex_wrap())
+    .when(!!onRow, (e) => press(e, onRow))
+    .child(div().flex_none().w(86).h(24).bg(ROLE.alert).flex().items_center().justify_center()
+      .text_size(TEXT_MIN).font_weight(700).text_color(ROLE.ink).child(KIND[n.kind] ?? up(n.kind ?? "FRAGE")))
+    .child(div().flex_1().min_w(links.length > 0 ? 120 : 0).text_size(TEXT_BODY).text_color(ROLE.text).child(String(n.text)))
+    .children(links.map((l) => prButton(`${id}-pr-${l.label.slice(4)}`, l)));
+}
 
 // a column's OPEN PRS: up to five rows, then +<k> MORE; a gh error as one alert line
 function openPrs(id, repo) {

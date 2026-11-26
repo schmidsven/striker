@@ -557,8 +557,9 @@ func runServe(c hc.Client, fleetPath string, args []string) int {
 		return 2
 	}
 	// each repo's GitHub slug and open PRs: gh at most once a minute per repo
-	pulls := &prs.Cache{GH: ghExec{hc.Exec{Bin: "gh"}}, Git: func(m string) gitrepo.Runner { return gitrepo.For(hc.Exec{}, m) },
-		Every: 60 * time.Second}
+	pulls := &prs.Cache{GH: ghExec{hc.Exec{Bin: "gh", Timeout: 10 * time.Second}},
+		Git: func(m string) gitrepo.Runner { return gitrepo.For(hc.Exec{}, m) }, Every: 60 * time.Second,
+		Bg: func(f func()) { go f() }}
 	build := func() status.Report {
 		f, err := fleet.Load(fleetPath)
 		if err != nil {
